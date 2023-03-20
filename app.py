@@ -142,7 +142,7 @@ def get_df():
     tax_changes = alt_simulation.calculate("household_tax", 2023) - simulation.calculate("household_tax", 2023)[0]
     net_income = simulation.calculate("household_net_income", 2023)[0]
     net_income_changes = alt_simulation.calculate("household_net_income", 2023) - donations - net_income
-    etrs = 1 - net_income_changes / winnings
+    take_home_pct = net_income_changes / winnings
 
     return pd.DataFrame(
         {
@@ -150,7 +150,7 @@ def get_df():
             "Tax change": tax_changes,
             "Baseline net income": [net_income] * len(donations),
             "Net income change": net_income_changes,
-            "Take-home percentage": etrs,
+            "Take-home percentage": take_home_pct,
         }
     )
 

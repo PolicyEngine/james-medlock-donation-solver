@@ -10,6 +10,7 @@ import json
 import numpy as np
 import pandas as pd
 from policyengine_us import Simulation, CountryTaxBenefitSystem
+import plotly.express as px
 
 system = CountryTaxBenefitSystem()
 
@@ -56,6 +57,7 @@ if is_joint:
         "tax_units": {
             "tax_unit": {
                 "members": ["filer", "spouse"],
+                "premium_tax_credit": {2023: 0},
             }
         },
         "spm_units": {
@@ -92,6 +94,7 @@ else:
         "tax_units": {
             "tax_unit": {
                 "members": ["filer"],
+                "premium_tax_credit": {2023: 0},
             }
         },
         "spm_units": {
@@ -119,44 +122,35 @@ donation_rate = st.slider(
 )
 
 
-def get_donation_etr(donation):
-    situation = json.loads(json.dumps(base_situation))
-    situation["people"]["filer"]["taxable_pension_income"][2023] = winnings
-    situation["people"]["filer"]["charitable_cash_donations"][2023] = donation
-
-    alt_simulation = Simulation(situation=situation)
-    return (
-        alt_simulation.calculate("household_tax", 2023)[0]
-        - simulation.calculate("household_tax", 2023)[0],
-        alt_simulation.calculate("household_net_income", 2023)[0]
-        - simulation.calculate("household_net_income", 2023)[0]
-        - donation,
-    )
-
-
 # Show a loading message while the data is being fetched.
 
 
-@st.cache_data(show_spinner=False)
-def get_df(net_income):
-    donations = []
-    tax_changes = []
-    net_income_changes = []
-    etrs = []
-    for donation in np.linspace(0, winnings, 20):
-        donations += [donation]
-        tax_change, net_income_change = get_donation_etr(donation)
-        tax_changes += [tax_change]
-        net_income_changes += [net_income_change]
-        etrs += [1 - net_income_change / winnings]
+def get_df():
+    simulation = Simulation(situation=base_situation)
+    situation = json.loads(json.dumps(base_situation))
+    situation["people"]["filer"]["taxable_pension_income"] = {2023: winnings}
+    situation["axes"] = [[{
+        "name": "charitable_cash_donations",
+        "period": 2023,
+        "min": 0,
+        "max": winnings,
+        "count": 100,
+    }]]
+
+    alt_simulation = Simulation(situation=situation)
+    donations = alt_simulation.calculate("charitable_cash_donations", 2023, map_to="household")
+    tax_changes = alt_simulation.calculate("household_tax", 2023) - simulation.calculate("household_tax", 2023)[0]
+    net_income = simulation.calculate("household_net_income", 2023)[0]
+    net_income_changes = alt_simulation.calculate("household_net_income", 2023) - donations - net_income
+    etrs = 1 - net_income_changes / winnings
 
     return pd.DataFrame(
         {
             "Donation": donations,
             "Tax change": tax_changes,
-            "Baseline net income": net_income,
+            "Baseline net income": [net_income] * len(donations),
             "Net income change": net_income_changes,
-            "Effective tax rate": etrs,
+            "Take-home percentage": etrs,
         }
     )
 
@@ -164,12 +158,10 @@ def get_df(net_income):
 calculate_pressed = True
 
 if calculate_pressed:
-    simulation = Simulation(situation=base_situation)
-    net_income = simulation.calculate("household_net_income", 2023)[0]
     with st.spinner(
         "Calculating James' take-home winnings under different donation sizes..."
     ):
-        df = get_df(net_income)
+        df = get_df()
 
     str_df = df.copy()
 
@@ -180,12 +172,53 @@ if calculate_pressed:
         str_df[col] = df[col].apply(lambda x: f"{x:.2%}")
 
     # Pick the row closest to the donation rate
-    df = df.iloc[
-        (df["Effective tax rate"] - donation_rate).abs().argsort()[:1]
+    df_subset = df.iloc[
+        (df["Take-home percentage"] - donation_rate).abs().argsort()[:1]
     ]
 
     st.write(
-        f"To ensure that James takes home close to {donation_rate:.2%} of his winnings, he should donate ${df['Donation'].values[0]:,.2f}. This results in a take-home percentage of {df['Effective tax rate'].values[0]:.2%}."
+        f"To ensure that James takes home close to {donation_rate:.2%} of his winnings, he should donate ${df_subset['Donation'].values[0]:,.2f}. This results in a take-home percentage of {df_subset['Take-home percentage'].values[0]:.2%}."
     )
 
     st.write(str_df)
+
+    fig = px.line(
+        df,
+        x="Donation",
+        y="Take-home percentage",
+        title="Take-home percentage vs. donation size",
+        color_discrete_sequence=["#2C6496"],
+    ).update_layout(
+        xaxis_title="Donation size",
+        xaxis_tickformat="$,.0f",
+        xaxis_range=[0, df["Donation"].max()],
+        yaxis_title="Take-home percentage",
+        yaxis_range=[0, 1],
+        yaxis_tickformat=".0%",
+        width=800,
+        height=600,
+        template="plotly_white",
+    )
+    
+    # Add a horizontal line at the donation rate
+    fig.add_shape(
+        type="line",
+        x0=0,
+        y0=donation_rate,
+        x1=df["Donation"].max(),
+        y1=donation_rate,
+        line=dict(color="#616161", dash="dash"),
+    )
+
+    # Add a label at the point where the lines intersect with the (x, y) coordinates
+    fig.add_annotation(
+        x=df_subset["Donation"].values[0] * 1.05,
+        y=df_subset["Take-home percentage"].values[0] * 0.95,
+        text=f"Take-home percentage: {df_subset['Take-home percentage'].values[0]:.2%} <br />from a donation of ${df_subset['Donation'].values[0]:,.2f}",
+        showarrow=True,
+        arrowhead=1,
+        ax=50,
+        ay=50,
+    )
+
+    st.plotly_chart(fig)

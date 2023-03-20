@@ -120,7 +120,7 @@ winnings = st.number_input("How much will James win?", value=1000000)
 def get_df():
     simulation = Simulation(situation=base_situation)
     situation = json.loads(json.dumps(base_situation))
-    situation["people"]["filer"]["taxable_pension_income"] = {2023: winnings}
+    situation["people"]["filer"]["miscellaneous_income"] = {2023: winnings}
     situation["axes"] = [[{
         "name": "charitable_cash_donations",
         "period": 2023,

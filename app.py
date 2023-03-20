@@ -113,14 +113,6 @@ else:
 
 winnings = st.number_input("How much will James win?", value=1000000)
 
-donation_rate = st.slider(
-    "What take-home percentage rate does James want to ensure?",
-    min_value=0.0,
-    max_value=1.0,
-    value=0.7,
-    step=0.01,
-)
-
 
 # Show a loading message while the data is being fetched.
 
@@ -171,6 +163,14 @@ if calculate_pressed:
     for col in df.columns[-1:]:
         str_df[col] = df[col].apply(lambda x: f"{x:.2%}")
 
+    donation_rate = st.slider(
+        "What take-home percentage rate does James want to ensure?",
+        min_value=0.0,
+        max_value=1.0,
+        value=0.7,
+        step=0.01,
+    )
+
     # Pick the row closest to the donation rate
     df_subset = df.iloc[
         (df["Take-home percentage"] - donation_rate).abs().argsort()[:1]
@@ -217,7 +217,7 @@ if calculate_pressed:
         text=f"Take-home percentage: {df_subset['Take-home percentage'].values[0]:.2%} <br />from a donation of ${df_subset['Donation'].values[0]:,.2f}",
         showarrow=True,
         arrowhead=1,
-        ax=50,
+        ax=0,
         ay=50,
     )
 

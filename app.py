@@ -158,10 +158,10 @@ if calculate_pressed:
     str_df = df.copy()
 
     for col in df.columns[:-1]:
-        str_df[col] = df[col].apply(lambda x: f"${x:,.2f}")
+        str_df[col] = df[col].apply(lambda x: f"${x:,.0f}")
 
     for col in df.columns[-1:]:
-        str_df[col] = df[col].apply(lambda x: f"{x:.2%}")
+        str_df[col] = df[col].apply(lambda x: f"{x:.1%}")
 
     donation_rate = st.slider(
         "What take-home percentage rate does James want to ensure?",
@@ -212,7 +212,7 @@ if calculate_pressed:
 
     # Add a label at the point where the lines intersect with the (x, y) coordinates
     fig.add_annotation(
-        x=df_subset["Donation"].values[0] * 1.05,
+        x=df_subset["Donation"].values[0],
         y=df_subset["Take-home percentage"].values[0] * 0.95,
         text=f"Take-home percentage: {df_subset['Take-home percentage'].values[0]:.2%} <br />from a donation of ${df_subset['Donation'].values[0]:,.2f}",
         showarrow=True,

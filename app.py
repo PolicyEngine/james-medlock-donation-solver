@@ -167,7 +167,7 @@ if calculate_pressed:
         "What take-home percentage rate does James want to ensure?",
         min_value=0.0,
         max_value=1.0,
-        value=0.7,
+        value=0.3,
         step=0.01,
     )
 

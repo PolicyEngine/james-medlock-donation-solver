@@ -177,7 +177,7 @@ if calculate_pressed:
     ]
 
     st.write(
-        f"To ensure that James takes home close to {donation_rate:.2%} of his winnings, he should donate ${df_subset['Donation'].values[0]:,.2f}. This results in a take-home percentage of {df_subset['Take-home percentage'].values[0]:.2%}."
+        f"To ensure that James takes home close to {donation_rate:.1%} of his winnings, he should donate ${df_subset['Donation'].values[0]:,.0f}. This results in a take-home percentage of {df_subset['Take-home percentage'].values[0]:.1%}."
     )
 
     st.write(str_df)
@@ -214,7 +214,7 @@ if calculate_pressed:
     fig.add_annotation(
         x=df_subset["Donation"].values[0],
         y=df_subset["Take-home percentage"].values[0] * 0.95,
-        text=f"Take-home percentage: {df_subset['Take-home percentage'].values[0]:.2%} <br />from a donation of ${df_subset['Donation'].values[0]:,.2f}",
+        text=f"Take-home percentage: {df_subset['Take-home percentage'].values[0]:.1%} <br />from a donation of ${df_subset['Donation'].values[0]:,.0f}",
         showarrow=True,
         arrowhead=1,
         ax=0,

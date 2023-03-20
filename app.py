@@ -3,7 +3,7 @@ import streamlit as st
 st.title("How much should James Medlock donate to GiveDirectly?")
 
 st.write(
-    "James Medlock may potentially win a $1m bet and wants to ensure he takes home 70\% of his winnings after taxes, by donating a certain amount to charity. This app will help him figure out how much he should donate."
+    "James Medlock may potentially win a $1m bet and wants to ensure he takes home 30\% of his winnings after taxes and charitable donations. This app will help him figure out how much he should donate."
 )
 
 import json

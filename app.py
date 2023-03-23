@@ -1,117 +1,82 @@
 import streamlit as st
 
+st.set_page_config(page_title="James Medlock donation solver")
+
 st.title("How much should James Medlock donate to GiveDirectly?")
 
+st.subheader(
+    "[Read the PolicyEngine blog post](https://policyengine.org/us/blog/2023-03-23-medlock-donation-calculator)"
+)
+
 st.write(
-    "James Medlock may potentially win a $1m bet and wants to ensure he takes home 30\% of his winnings after taxes and charitable donations. This app will help him figure out how much he should donate."
+    "Twitter user James Medlock has entered a \$1 million bet with Balaji Srinivasan. If he wins, he plans to give enough to GiveDirectly such that he takes home \$300,000 after taxes and donations. This app uses the PolicyEngine US Python package to estimate out how much he should donate."
 )
 
 import json
-import numpy as np
 import pandas as pd
 from policyengine_us import Simulation, CountryTaxBenefitSystem
 import plotly.express as px
+import pkg_resources
+
 
 system = CountryTaxBenefitSystem()
 
-# state_code = st.selectbox("What state do you live in?", [enum.name for enum in system.variables["state_code"].possible_values])
+STATE_CODE = "CA"
 
-state_code = "CA"
+# Ask for employment income and self-employment income for both spouses, numeric entry
 
-# is_joint = st.checkbox("Are you filing jointly?", value=False)
+filer_employment_income = st.number_input(
+    "How much will Medlock earn from wages and salaries in 2023?", value=0
+)
+filer_self_employment_income = st.number_input(
+    "How much will Medlock earn from self-employment in 2023?", value=0
+)
 
-is_joint = True
+spouse_employment_income = st.number_input(
+    "How much will Medlock's wife earn from wages and salaries in 2023?",
+    value=0,
+)
+spouse_self_employment_income = st.number_input(
+    "How much will Medlock's wife earn from self-employment in 2023?",
+    value=0,
+)
 
-if is_joint:
-    # Ask for employment income and self-employment income for both spouses, numeric entry
 
-    filer_employment_income = st.number_input(
-        "How much did James earn from wages and salaries?", value=0
-    )
-    filer_self_employment_income = st.number_input(
-        "How much did James earn from self-employment?", value=0
-    )
+WINNINGS = 1_000_000
+TAKE_HOME_SHARE = 0.3
 
-    spouse_employment_income = st.number_input(
-        "How much did James' spouse earn from wages and salaries?", value=0
-    )
-    spouse_self_employment_income = st.number_input(
-        "How much did James' spouse earn from self-employment?", value=0
-    )
 
-    base_situation = {
-        "people": {
-            "filer": {
-                "age": {2023: 40},
-                "employment_income": {2023: filer_employment_income},
-                "self_employment_income": {2023: filer_self_employment_income},
-            },
-            "spouse": {
-                "age": {2023: 40},
-                "employment_income": {2023: spouse_employment_income},
-                "self_employment_income": {
-                    2023: spouse_self_employment_income
-                },
-            },
+base_situation = {
+    "people": {
+        "filer": {
+            "age": {2023: 33},
+            "employment_income": {2023: filer_employment_income},
+            "self_employment_income": {2023: filer_self_employment_income},
         },
-        "tax_units": {
-            "tax_unit": {
-                "members": ["filer", "spouse"],
-                "premium_tax_credit": {2023: 0},
-            }
+        "spouse": {
+            "age": {2023: 33},
+            "employment_income": {2023: spouse_employment_income},
+            "self_employment_income": {2023: spouse_self_employment_income},
         },
-        "spm_units": {
-            "spm_unit": {
-                "members": ["filer", "spouse"],
-            }
+    },
+    "tax_units": {
+        "tax_unit": {
+            "members": ["filer", "spouse"],
+            "premium_tax_credit": {2023: 0},
+        }
+    },
+    "spm_units": {
+        "spm_unit": {
+            "members": ["filer", "spouse"],
+        }
+    },
+    "households": {
+        "household": {
+            "members": ["filer", "spouse"],
+            "state_code": {2023: STATE_CODE},
         },
-        "households": {
-            "household": {
-                "members": ["filer", "spouse"],
-                "state_code": {2023: state_code},
-            },
-        },
-    }
-
-else:
-    # Ask for employment income and self-employment income for one spouse, numeric entry
-
-    filer_employment_income = st.number_input(
-        "How much did James earn from wages and salaries?", value=0
-    )
-    filer_self_employment_income = st.number_input(
-        "How much did James earn from self-employment?", value=0
-    )
-
-    base_situation = {
-        "people": {
-            "filer": {
-                "age": {2023: 40},
-                "employment_income": {2023: filer_employment_income},
-                "self_employment_income": {2023: filer_self_employment_income},
-            },
-        },
-        "tax_units": {
-            "tax_unit": {
-                "members": ["filer"],
-                "premium_tax_credit": {2023: 0},
-            }
-        },
-        "spm_units": {
-            "spm_unit": {
-                "members": ["filer"],
-            }
-        },
-        "households": {
-            "household": {
-                "members": ["filer"],
-                "state_code": {2023: state_code},
-            },
-        },
-    }
-
-
-winnings = st.number_input("How much will James win?", value=1000000)
+    },
+}
 
 
 # Show a loading message while the data is being fetched.
@@ -120,21 +85,34 @@ winnings = st.number_input("How much will James win?", value=1000000)
 def get_df():
     simulation = Simulation(situation=base_situation)
     situation = json.loads(json.dumps(base_situation))
-    situation["people"]["filer"]["miscellaneous_income"] = {2023: winnings}
-    situation["axes"] = [[{
-        "name": "charitable_cash_donations",
-        "period": 2023,
-        "min": 0,
-        "max": winnings,
-        "count": 100,
-    }]]
+    situation["people"]["filer"]["miscellaneous_income"] = {2023: WINNINGS}
+    situation["axes"] = [
+        [
+            {
+                "name": "charitable_cash_donations",
+                "period": 2023,
+                "min": 0,
+                "max": WINNINGS,
+                "count": 100,
+            }
+        ]
+    ]
 
     alt_simulation = Simulation(situation=situation)
-    donations = alt_simulation.calculate("charitable_cash_donations", 2023, map_to="household")
-    tax_changes = alt_simulation.calculate("household_tax", 2023) - simulation.calculate("household_tax", 2023)[0]
+    donations = alt_simulation.calculate(
+        "charitable_cash_donations", 2023, map_to="household"
+    )
+    tax_changes = (
+        alt_simulation.calculate("household_tax", 2023)
+        - simulation.calculate("household_tax", 2023)[0]
+    )
     net_income = simulation.calculate("household_net_income", 2023)[0]
-    net_income_changes = alt_simulation.calculate("household_net_income", 2023) - donations - net_income
-    take_home_pct = net_income_changes / winnings
+    net_income_changes = (
+        alt_simulation.calculate("household_net_income", 2023)
+        - donations
+        - net_income
+    )
+    take_home_pct = net_income_changes / WINNINGS
 
     return pd.DataFrame(
         {
@@ -163,21 +141,13 @@ if calculate_pressed:
     for col in df.columns[-1:]:
         str_df[col] = df[col].apply(lambda x: f"{x:.1%}")
 
-    donation_rate = st.slider(
-        "What take-home percentage rate does James want to ensure?",
-        min_value=0.0,
-        max_value=1.0,
-        value=0.3,
-        step=0.01,
-    )
-
     # Pick the row closest to the donation rate
     df_subset = df.iloc[
-        (df["Take-home percentage"] - donation_rate).abs().argsort()[:1]
+        (df["Take-home percentage"] - TAKE_HOME_SHARE).abs().argsort()[:1]
     ]
 
     st.write(
-        f"To ensure that James takes home close to {donation_rate:.1%} of his winnings, he should donate ${df_subset['Donation'].values[0]:,.0f}. This results in a take-home percentage of {df_subset['Take-home percentage'].values[0]:.1%}."
+        f"If Medlock donates **${df_subset['Donation'].values[0]:,.0f}**, he will take home {df_subset['Take-home percentage'].values[0]:.1%} of his winnings after taxes and donations."
     )
 
     st.write(str_df)
@@ -186,7 +156,7 @@ if calculate_pressed:
         df,
         x="Donation",
         y="Take-home percentage",
-        title="Take-home percentage vs. donation size",
+        title="How Medlock's donation affects the share of winnings he takes home",
         color_discrete_sequence=["#2C6496"],
     ).update_layout(
         xaxis_title="Donation size",
@@ -199,14 +169,14 @@ if calculate_pressed:
         height=600,
         template="plotly_white",
     )
-    
+
     # Add a horizontal line at the donation rate
     fig.add_shape(
         type="line",
         x0=0,
-        y0=donation_rate,
+        y0=TAKE_HOME_SHARE,
         x1=df["Donation"].max(),
-        y1=donation_rate,
+        y1=TAKE_HOME_SHARE,
         line=dict(color="#616161", dash="dash"),
     )
 
@@ -222,3 +192,14 @@ if calculate_pressed:
     )
 
     st.plotly_chart(fig)
+
+st.header("Assumptions")
+
+# Get the version of policyengine_us
+policyengine_us_version = pkg_resources.get_distribution(
+    "policyengine_us"
+).version
+
+st.write(
+    f"This uses the [PolicyEngine US Python package v{policyengine_us_version}](https://github.com/PolicyEngine/policyengine-us), assuming Medlock lives in California, and that he and his wife are both 33 years old and have no other income or special circumstances that would provide tax credits or deductions (beyond SALT and the charitable deduction). California has not yet released 2023 tax brackets, so we use 2022 values."
+)
